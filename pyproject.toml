@@ -1,0 +1,15 @@
+[project]
+name = "autopilotenv"
+version = "1.0.0"
+description = "Autonomous driving OpenEnv environment"
+authors = [{ name = "Tejas" }]
+dependencies = [
+    "pydantic",
+    "fastapi",
+    "uvicorn",
+    "openai"
+]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
