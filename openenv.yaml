@@ -28,3 +28,13 @@ tasks:
     difficulty: hard
     objective: Obey traffic signals and protect pedestrians at crossings.
     grader: grader:grade_signal_handling
+
+  - id: emergency_braking
+    difficulty: medium
+    objective: Safely stop when a sudden obstacle appears.
+    grader: grader:grade_obstacle_avoidance
+
+  - id: pedestrian_priority
+    difficulty: hard
+    objective: Yield and stop for crossing pedestrians.
+    grader: grader:grade_signal_handling
