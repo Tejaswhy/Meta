@@ -25,33 +25,49 @@ class AutoPilotEnv:
         self.max_steps_per_task: int = 6
 
     def _build_tasks(self) -> List[Dict[str, Any]]:
-        return [
-            {
-                "task_name": "lane_keeping",
-                "difficulty": "easy",
-                "step": 0,
-                "lane_position": 0.10,
-                "speed": 42.0,
-                "speed_limit": 50.0,
-                "road_curvature": "slight_left",
-            },
-            {
-                "task_name": "obstacle_avoidance",
-                "difficulty": "medium",
-                "step": 0,
-                "front_distance": 5.0,
-                "left_lane_clear": True,
-                "right_lane_clear": False,
-            },
-            {
-                "task_name": "signal_safety",
-                "difficulty": "hard",
-                "step": 0,
-                "traffic_light": "red",
-                "pedestrian_crossing": True,
-                "pedestrian_distance": 4.0,
-            },
-        ]
+       return [
+        {
+            "task_name": "lane_keeping",
+            "difficulty": "easy",
+            "step": 0,
+            "lane_position": 0.10,
+            "speed": 42.0,
+            "speed_limit": 50.0,
+            "road_curvature": "slight_left",
+        },
+        {
+            "task_name": "obstacle_avoidance",
+            "difficulty": "medium",
+            "step": 0,
+            "front_distance": 5.0,
+            "left_lane_clear": True,
+            "right_lane_clear": False,
+        },
+        {
+            "task_name": "signal_safety",
+            "difficulty": "hard",
+            "step": 0,
+            "traffic_light": "red",
+            "pedestrian_crossing": True,
+            "pedestrian_distance": 4.0,
+        },
+        {
+            "task_name": "emergency_braking",
+            "difficulty": "medium",
+            "step": 0,
+            "front_distance": 2.0,
+            "left_lane_clear": False,
+            "right_lane_clear": False,
+        },
+        {
+            "task_name": "pedestrian_priority",
+            "difficulty": "hard",
+            "step": 0,
+            "traffic_light": "green",
+            "pedestrian_crossing": True,
+            "pedestrian_distance": 3.0,
+        },
+    ]
 
     def _obs(self) -> Observation:
         return Observation(**self.current_task)
