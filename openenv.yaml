@@ -1,0 +1,22 @@
+name: autopilotenv
+description: Deterministic autonomous driving decision environment for the Meta OpenEnv RL Challenge.
+version: 1.0.0
+entrypoint: app:AutoPilotEnv
+author: AutoPilotEnv Team
+tags:
+  - openenv
+  - autonomous-driving
+  - safety
+observation_model: models:Observation
+action_model: models:Action
+reward_model: models:Reward
+tasks:
+  - id: lane_keeping
+    difficulty: easy
+    objective: Keep lane center while obeying speed limits and smooth control.
+  - id: obstacle_avoidance
+    difficulty: medium
+    objective: Avoid frontal obstacle by braking or safe lane change.
+  - id: signal_safety
+    difficulty: hard
+    objective: Obey traffic signals and protect pedestrians at crossings.
