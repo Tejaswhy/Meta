@@ -11,4 +11,4 @@ RUN pip install --upgrade pip && pip install -r /app/requirements.txt
 
 COPY . /app
 
-CMD ["python", "inference.py"]
+CMD ["openenv", "serve"]
