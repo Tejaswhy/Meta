@@ -2,7 +2,7 @@ openai
 pydantic>=2,<3
 pyyaml
 gradio
-openenv
+openenv>=0.1.13
 pytest
 fastapi
 uvicorn
