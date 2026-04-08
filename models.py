@@ -1,11 +1,22 @@
 from typing import Literal, Optional
-
 from pydantic import BaseModel, Field
 
+TaskName = Literal[
+    "lane_keeping",
+    "obstacle_avoidance",
+    "signal_safety",
+    "emergency_braking",
+    "pedestrian_priority"
+]
 
-TaskName = Literal["lane_keeping", "obstacle_avoidance", "signal_safety"]
 TrafficLight = Literal["red", "yellow", "green"]
-RoadCurvature = Literal["straight", "slight_left", "slight_right", "sharp_left", "sharp_right"]
+RoadCurvature = Literal[
+    "straight",
+    "slight_left",
+    "slight_right",
+    "sharp_left",
+    "sharp_right"
+]
 
 
 class Observation(BaseModel):
@@ -31,9 +42,11 @@ class Action(BaseModel):
     acceleration: float = 0.0
     brake: float = 0.0
     action_type: Optional[str] = None
-    lane_change: Optional[Literal["left", "right", "none"]] = "none"
+    lane_change: Optional[
+        Literal["left", "right", "none"]
+    ] = "none"
 
 
 class Reward(BaseModel):
-    score: float = Field(ge=-1.0, le=1.0)
+    score: float = Field(gt=0.0, lt=1.0)
     reason: str
