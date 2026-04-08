@@ -1,12 +1,17 @@
 from models import Action
 
 
-def _clamp01(value: float) -> float:
-    return max(0.0, min(1.0, value))
+def _strict_score(value: float) -> float:
+    """
+    Keep score strictly inside (0, 1).
+    Validator does NOT allow 0.0 or 1.0
+    """
+    return round(min(max(value, 0.01), 0.99), 4)
 
 
 def grade_lane_keeping(observation: dict, action: Action) -> float:
     score = 0.0
+
     lane_position = float(observation.get("lane_position", 1.0))
     speed = float(observation.get("speed", 0.0))
     speed_limit = float(observation.get("speed_limit", 50.0))
@@ -28,7 +33,7 @@ def grade_lane_keeping(observation: dict, action: Action) -> float:
     elif abs(action.steering) <= 0.60:
         score += 0.1
 
-    return round(_clamp01(score), 4)
+    return _strict_score(score)
 
 
 def grade_obstacle_avoidance(observation: dict, action: Action) -> float:
@@ -36,45 +41,78 @@ def grade_obstacle_avoidance(observation: dict, action: Action) -> float:
     left_lane_clear = bool(observation.get("left_lane_clear", False))
     right_lane_clear = bool(observation.get("right_lane_clear", False))
 
-    if front_distance <= 3.0:
-        if action.action_type in {"emergency_stop", "brake"} and action.brake >= 0.8:
-            return 1.0
-        return 0.0
+    score = 0.5
 
-    if front_distance <= 7.0:
+    if front_distance <= 3.0:
+        if (
+            action.action_type in {"emergency_stop", "brake"}
+            and action.brake >= 0.8
+        ):
+            score = 0.95
+        else:
+            score = 0.05
+
+    elif front_distance <= 7.0:
         if action.action_type == "change_lane":
             if action.lane_change == "left" and left_lane_clear:
-                return 1.0
-            if action.lane_change == "right" and right_lane_clear:
-                return 1.0
-            return 0.2
-        if action.action_type == "brake" and action.brake >= 0.5:
-            return 0.8
-        return 0.1
+                score = 0.92
+            elif action.lane_change == "right" and right_lane_clear:
+                score = 0.92
+            else:
+                score = 0.2
 
-    if action.action_type in {"proceed", "maintain"}:
-        return 0.9
-    return 0.7
+        elif action.action_type == "brake" and action.brake >= 0.5:
+            score = 0.8
+
+        else:
+            score = 0.1
+
+    else:
+        if action.action_type in {"proceed", "maintain"}:
+            score = 0.9
+        else:
+            score = 0.7
+
+    return _strict_score(score)
 
 
 def grade_signal_handling(observation: dict, action: Action) -> float:
     light = observation.get("traffic_light")
     crossing = bool(observation.get("pedestrian_crossing", False))
-    pedestrian_distance = float(observation.get("pedestrian_distance", 999.0))
+    pedestrian_distance = float(
+        observation.get("pedestrian_distance", 999.0)
+    )
 
-    must_stop = light == "red" or (crossing and pedestrian_distance <= 8.0)
+    must_stop = light == "red" or (
+        crossing and pedestrian_distance <= 8.0
+    )
+
     soft_caution = light == "yellow"
 
+    score = 0.5
+
     if must_stop:
-        if action.action_type in {"stop", "brake"} and action.brake >= 0.6:
-            return 1.0
-        return 0.0
+        if (
+            action.action_type in {"stop", "brake"}
+            and action.brake >= 0.6
+        ):
+            score = 0.95
+        else:
+            score = 0.05
 
-    if soft_caution:
+    elif soft_caution:
         if action.action_type in {"brake", "proceed"}:
-            return 0.8
-        return 0.4
+            score = 0.8
+        else:
+            score = 0.4
 
-    if action.action_type in {"proceed", "maintain"} and action.brake < 0.3:
-        return 1.0
-    return 0.6
+    else:
+        if (
+            action.action_type in {"proceed", "maintain"}
+            and action.brake < 0.3
+        ):
+            score = 0.92
+        else:
+            score = 0.6
+
+    return _strict_score(score)
