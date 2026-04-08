@@ -1,9 +1,6 @@
-
 from __future__ import annotations
 
 import os
-from typing import Optional
-
 from openai import OpenAI
 
 from env import AutoPilotEnv
@@ -45,20 +42,26 @@ def _fallback_action(task_name: str) -> Action:
 
 
 def main() -> None:
+    client = OpenAI(
+        base_url=API_BASE_URL,
+        api_key=HF_TOKEN
+    )
+
     env = AutoPilotEnv()
 
     rewards = []
     steps = 0
     success = False
+    score = 0.0
 
     print(
         f"[START] task=lane_keeping "
-        f"env=autopilotenv model={MODEL_NAME}"
+        f"env=autopilotenv "
+        f"model={MODEL_NAME}"
     )
 
     try:
         obs = env.reset()
-
         max_steps = 6
 
         for step in range(1, max_steps + 1):
@@ -69,7 +72,7 @@ def main() -> None:
             obs, reward, done, info = env.step(action)
 
             steps = step
-            rewards.append(_fmt_reward(reward.score))
+            rewards.append(reward.score)
 
             print(
                 f"[STEP] step={step} "
@@ -83,34 +86,36 @@ def main() -> None:
                 success = reward.score > 0
                 break
 
+        if rewards:
+            score = min(max(sum(rewards) / len(rewards), 0.0), 1.0)
+
     except Exception as exc:
         steps = 1
-        rewards.append("-1.00")
+        rewards.append(-1.0)
 
         print(
-            f"[STEP] step=1 action=none "
+            f"[STEP] step=1 "
+            f"action=none "
             f"reward=-1.00 "
             f"done=true "
             f"error={str(exc).replace(chr(10), ' ')[:120]}"
         )
 
         success = False
+        score = 0.0
 
     finally:
         env.close()
 
+        rewards_str = ",".join(_fmt_reward(r) for r in rewards)
+
         print(
             f"[END] success={_bool_str(success)} "
             f"steps={steps} "
-            f"rewards={','.join(rewards)}"
+            f"score={score:.2f} "
+            f"rewards={rewards_str}"
         )
-
-
-
-
 
 
 if __name__ == "__main__":
     main()
-
-
