@@ -38,7 +38,6 @@ def render_car_html(
         <div style="position:absolute;left:50%;top:0;width:4px;height:100%;background:#bbb;"></div>
         <div style="position:absolute;left:25%;top:0;width:2px;height:100%;background:#ddd;"></div>
         <div style="position:absolute;right:25%;top:0;width:2px;height:100%;background:#ddd;"></div>
-
         <div style="
             position:absolute;
             left:50%;
@@ -63,7 +62,6 @@ def render_car_html(
                     background:#444;
                     border-radius:8px;
                 "></div>
-
                 <div style="position:absolute;width:18px;height:18px;background:#222;border-radius:50%;left:5px;top:-8px;"></div>
                 <div style="position:absolute;width:18px;height:18px;background:#222;border-radius:50%;right:5px;top:-8px;"></div>
                 <div style="position:absolute;width:18px;height:18px;background:#222;border-radius:50%;left:5px;bottom:-8px;"></div>
@@ -125,45 +123,34 @@ with gr.Blocks(title="AutoPilotEnv Live Joystick Dashboard") as demo:
 
     RULES_TEXT = """
 # AutoPilotEnv Rule Book
-
 ## Goal
 Drive safely and maximize reward.
-
 Avoid:
 - collisions
 - red light violations
 - unsafe lane changes
 - overspeeding
-
 ---
-
 ## Controls
 ### Steering
 - -1.0 = left
 - 0.0 = straight
 - 1.0 = right
-
 ### Throttle
 - positive = accelerate
 - negative = brake
-
 ---
-
 ## Obstacle Rules
 - >10m = safe
 - 5–10m = slow down
 - <5m = brake or lane change
 - <3m = emergency stop
-
 ---
-
 ## Traffic Rules
 - red = stop
 - yellow = caution
 - green = proceed
-
 ---
-
 ## Rewards
 - 1.0 = perfect
 - 0.8 = good
@@ -233,3 +220,47 @@ Avoid:
 
 if __name__ == "__main__":
     demo.launch(server_name="0.0.0.0", server_port=7860)
+
+
+from fastapi import FastAPI
+from models import Action
+
+api = FastAPI()
+
+_env = AutoPilotEnv()
+
+
+@api.get("/")
+def home():
+    return {
+        "status": "AutoPilotEnv API is running 🚀",
+        "routes": [
+            "POST /reset",
+            "POST /step",
+            "GET /state"
+        ]
+    }
+
+
+@api.post("/reset")
+def reset():
+    obs = _env.reset()
+    return obs.model_dump()
+
+
+@api.post("/step")
+def step(action: dict):
+    action_obj = Action(**action)
+    obs, reward, done, info = _env.step(action_obj)
+
+    return {
+        "observation": obs.model_dump(),
+        "reward": reward.model_dump(),
+        "done": done,
+        "info": info,
+    }
+
+
+@api.get("/state")
+def state():
+    return _env.state().model_dump()
