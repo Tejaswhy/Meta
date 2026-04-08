@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import os
 from openai import OpenAI
 
@@ -11,15 +9,7 @@ MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4.1-mini")
 API_KEY = os.environ["API_KEY"]
 
 
-def _bool_str(value: bool) -> str:
-    return "true" if value else "false"
-
-
-def _fmt_reward(value: float) -> str:
-    return f"{value:.2f}"
-
-
-def _fallback_action(task_name: str) -> Action:
+def fallback_action(task_name):
     if task_name == "lane_keeping":
         return Action(
             action_type="maintain",
@@ -31,7 +21,7 @@ def _fallback_action(task_name: str) -> Action:
 
     elif task_name in {
         "obstacle_avoidance",
-        "emergency_braking",
+        "emergency_braking"
     }:
         return Action(
             action_type="change_lane",
@@ -51,7 +41,7 @@ def _fallback_action(task_name: str) -> Action:
         )
 
 
-def main() -> None:
+def main():
     client = OpenAI(
         base_url=API_BASE_URL,
         api_key=API_KEY
@@ -72,42 +62,28 @@ def main() -> None:
     try:
         obs = env.reset()
 
-        client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
-                {
-                    "role": "user",
-                    "content": "Choose safe driving action"
-                }
-            ]
-        )
-
-        for task_run in range(5):
-            action = _fallback_action(obs.task_name)
+        for _ in range(5):
+            action = fallback_action(obs.task_name)
 
             obs, reward, done, info = env.step(action)
 
-            safe_reward = min(
-                max(float(reward.score), 0.01),
-                0.99,
-            )
-
+            rewards.append(reward.score)
             steps += 1
-            rewards.append(safe_reward)
 
             print(
                 f"[STEP] step={steps} "
                 f"action={action.action_type} "
-                f"reward={_fmt_reward(safe_reward)} "
-                f"done={_bool_str(done)} "
+                f"reward={reward.score:.2f} "
+                f"done={str(done).lower()} "
                 f"error=null"
             )
 
             if done:
                 success = True
+                break
 
         rewards_str = ",".join(
-            _fmt_reward(r) for r in rewards
+            f"{r:.2f}" for r in rewards
         )
 
     except Exception as exc:
@@ -118,14 +94,14 @@ def main() -> None:
             f"action=none "
             f"reward=0.01 "
             f"done=true "
-            f"error={str(exc)[:120]}"
+            f"error={str(exc)}"
         )
 
     finally:
         env.close()
 
         print(
-            f"[END] success={_bool_str(success)} "
+            f"[END] success={str(success).lower()} "
             f"steps={steps} "
             f"rewards={rewards_str}"
         )
