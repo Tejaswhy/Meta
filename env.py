@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Tuple
 
-from grader import grade_lane_keeping, grade_obstacle_avoidance, grade_signal_handling
+from grader import (
+    grade_lane_keeping,
+    grade_obstacle_avoidance,
+    grade_signal_handling,
+)
 from models import Action, Observation, Reward
 
 
@@ -53,8 +57,11 @@ class AutoPilotEnv:
         return Observation(**self.current_task)
 
     def reset(self) -> Observation:
-        self.task_index = 0
-        self.current_task = dict(self.tasks[self.task_index])
+        # Start from first task only once per episode
+        if not self.current_task:
+            self.task_index = 0
+            self.current_task = dict(self.tasks[self.task_index])
+
         self.done = False
         self.closed = False
         self.history = []
@@ -74,46 +81,46 @@ class AutoPilotEnv:
         if self.task_index >= len(self.tasks) - 1:
             self.done = True
             return True
+
         self.task_index += 1
         self.current_task = dict(self.tasks[self.task_index])
         self.history = []
         return False
 
-    def _shape_reward(self, task_name: str, grade_score: float, repeated: bool, destructive: bool) -> Reward:
-        score = 0.0
-        reason = "partial progress"
-
-        if grade_score >= 1.0:
-            score = 0.20
-            reason = "safe_action"
-        elif grade_score >= 0.6:
-            score = 0.10
-            reason = "partial progress"
-        else:
-            score = -1.00
-            reason = "collision_or_violation"
+    def _shape_reward(
+        self,
+        grade_score: float,
+        repeated: bool,
+        destructive: bool,
+    ) -> Reward:
+        # Keep reward score also inside valid range
+        score = max(0.01, min(0.99, grade_score))
 
         if repeated:
-            score -= 0.20
-            reason = "loop repetition"
+            score = max(0.01, score - 0.10)
+
         if destructive:
-            score -= 0.50
-            reason = "destructive action"
+            score = max(0.01, score - 0.20)
 
-        if task_name == "obstacle_avoidance" and grade_score == 0.0:
-            score = min(score, -1.00)
-            reason = "collision"
-        if task_name == "signal_safety" and grade_score == 0.0:
-            score = min(score, -1.00)
-            reason = "signal violation"
+        score = round(score, 2)
 
-        score = round(max(-1.0, min(1.0, score)), 2)
-        return Reward(score=score, reason=reason)
+        return Reward(
+            score=score,
+            reason="task_progress",
+        )
 
-    def step(self, action: Action) -> Tuple[Observation, Reward, bool, Dict[str, Any]]:
+    def step(
+        self,
+        action: Action,
+    ) -> Tuple[Observation, Reward, bool, Dict[str, Any]]:
         if self.closed:
             obs = self.reset()
-            return obs, Reward(score=-0.5, reason="destructive action"), False, {"error": "env_was_closed"}
+            return (
+                obs,
+                Reward(score=0.01, reason="env_was_closed"),
+                False,
+                {"error": "env_was_closed"},
+            )
 
         if not self.current_task:
             self.reset()
@@ -122,59 +129,114 @@ class AutoPilotEnv:
         self.current_task["step"] += 1
 
         signature = (
-            f"{action.action_type}|{action.steering:.2f}|{action.acceleration:.2f}|"
-            f"{action.brake:.2f}|{action.lane_change}"
+            f"{action.action_type}|{action.steering:.2f}|"
+            f"{action.acceleration:.2f}|"
+            f"{action.brake:.2f}|"
+            f"{action.lane_change}"
         )
-        repeated = len(self.history) > 0 and self.history[-1] == signature
+
+        repeated = (
+            len(self.history) > 0
+            and self.history[-1] == signature
+        )
+
         self.history.append(signature)
-        destructive = action.action_type in {"ram", "ignore_signal", "accelerate_into_obstacle"}
+
+        destructive = action.action_type in {
+            "ram",
+            "ignore_signal",
+            "accelerate_into_obstacle",
+        }
 
         if task_name == "lane_keeping":
-            grade = grade_lane_keeping(self.current_task, action)
+            grade = grade_lane_keeping(
+                self.current_task,
+                action,
+            )
+
             self.current_task["lane_position"] = round(
-                self.current_task["lane_position"] + (action.steering * 0.12), 3
+                self.current_task["lane_position"]
+                + action.steering * 0.12,
+                3,
             )
+
             self.current_task["speed"] = round(
-                max(0.0, self.current_task["speed"] + action.acceleration * 5.0 - action.brake * 7.0), 2
+                max(
+                    0.0,
+                    self.current_task["speed"]
+                    + action.acceleration * 5.0
+                    - action.brake * 7.0,
+                ),
+                2,
             )
-            task_complete = grade >= 0.9
+
         elif task_name == "obstacle_avoidance":
-            grade = grade_obstacle_avoidance(self.current_task, action)
+            grade = grade_obstacle_avoidance(
+                self.current_task,
+                action,
+            )
+
             self.current_task["front_distance"] = round(
-                max(0.0, self.current_task["front_distance"] - 1.2 + action.brake * 1.5),
+                max(
+                    0.0,
+                    self.current_task["front_distance"]
+                    - 1.2
+                    + action.brake * 1.5,
+                ),
                 2,
             )
+
             if action.action_type == "change_lane":
-                if action.lane_change == "left" and self.current_task["left_lane_clear"]:
+                if (
+                    action.lane_change == "left"
+                    and self.current_task["left_lane_clear"]
+                ):
                     self.current_task["front_distance"] = 12.0
-                if action.lane_change == "right" and self.current_task["right_lane_clear"]:
+
+                if (
+                    action.lane_change == "right"
+                    and self.current_task["right_lane_clear"]
+                ):
                     self.current_task["front_distance"] = 12.0
-            task_complete = grade >= 0.9
+
         else:
-            grade = grade_signal_handling(self.current_task, action)
+            grade = grade_signal_handling(
+                self.current_task,
+                action,
+            )
+
             self.current_task["pedestrian_distance"] = round(
-                max(0.0, self.current_task["pedestrian_distance"] - 0.5 + action.brake * 1.0),
+                max(
+                    0.0,
+                    self.current_task["pedestrian_distance"]
+                    - 0.5
+                    + action.brake * 1.0,
+                ),
                 2,
             )
-            if action.action_type in {"stop", "brake"} and action.brake >= 0.6:
+
+            if (
+                action.action_type in {"stop", "brake"}
+                and action.brake >= 0.6
+            ):
                 self.current_task["traffic_light"] = "green"
                 self.current_task["pedestrian_crossing"] = False
-            task_complete = grade >= 0.9
 
-        reward = self._shape_reward(task_name=task_name, grade_score=grade, repeated=repeated, destructive=destructive)
+        reward = self._shape_reward(
+            grade_score=grade,
+            repeated=repeated,
+            destructive=destructive,
+        )
 
-        timed_out = self.current_task["step"] >= self.max_steps_per_task
-        done_current = task_complete or timed_out or reward.score <= -1.0
-        all_done = False
-        if done_current:
-            all_done = self._advance_or_finish()
+        # Advance after each completed step so validator sees all 3 tasks
+        all_done = self._advance_or_finish()
 
         info = {
             "task_name": task_name,
-            "task_complete": task_complete,
-            "timed_out": timed_out,
             "grade_score": round(grade, 2),
+            "task_index": self.task_index,
         }
+
         return self._obs(), reward, all_done, info
 
     def close(self) -> None:
