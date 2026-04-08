@@ -7,8 +7,12 @@ dependencies = [
     "pydantic",
     "fastapi",
     "uvicorn",
-    "openai"
+    "openai",
+    "openenv>=0.1.13"
 ]
+
+[project.scripts]
+server = "server.app:api"
 
 [build-system]
 requires = ["setuptools", "wheel"]
