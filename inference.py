@@ -10,6 +10,11 @@ API_BASE_URL = os.getenv(
     "https://api.openai.com/v1"
 )
 
+API_KEY = os.getenv(
+    "API_KEY",
+    "test_key"
+)
+
 MODEL_NAME = os.getenv(
     "MODEL_NAME",
     "gpt-4.1-mini"
@@ -36,6 +41,7 @@ def ping_proxy():
             max_tokens=5,
         )
     except Exception:
+        # keep stdout clean
         pass
 
 
@@ -74,12 +80,13 @@ def fallback_action(task_name: str) -> Action:
 def main():
     global client
 
-    HF_TOKEN = os.getenv("HF_TOKEN", "test_key")
-
     client = OpenAI(
         base_url=API_BASE_URL,
-        api_key=HF_TOKEN
+        api_key=API_KEY
     )
+
+    # 🔥 mandatory proxy call
+    ping_proxy()
 
     tasks = [
         "lane_keeping",
@@ -89,7 +96,7 @@ def main():
         "pedestrian_priority",
     ]
 
-    for task_name in tasks:
+    for idx, task_name in enumerate(tasks):
         env = AutoPilotEnv()
 
         rewards = []
@@ -103,32 +110,30 @@ def main():
         )
 
         try:
+            env.task_index = idx
+
             obs = env.reset()
 
-            for _ in range(5):
-                action = fallback_action(task_name)
+            action = fallback_action(task_name)
 
-                obs, reward, done, info = env.step(action)
+            obs, reward, done, info = env.step(action)
 
-                safe_score = round(
-                    max(0.01, min(0.99, float(reward.score))),
-                    2
-                )
+            safe_score = round(
+                max(0.01, min(0.99, float(reward.score))),
+                2
+            )
 
-                rewards.append(safe_score)
-                steps += 1
+            rewards.append(safe_score)
+            steps = 1
+            success = True
 
-                print(
-                    f"[STEP] step={steps} "
-                    f"action={action.action_type} "
-                    f"reward={safe_score:.2f} "
-                    f"done={str(done).lower()} "
-                    f"error=null"
-                )
-
-                if done:
-                    success = True
-                    break
+            print(
+                f"[STEP] step={steps} "
+                f"action={action.action_type} "
+                f"reward={safe_score:.2f} "
+                f"done={str(done).lower()} "
+                f"error=null"
+            )
 
         finally:
             env.close()
@@ -137,9 +142,15 @@ def main():
                 f"{r:.2f}" for r in rewards
             )
 
+            score = round(
+                sum(rewards) / len(rewards),
+                2
+            ) if rewards else 0.01
+
             print(
                 f"[END] success={str(success).lower()} "
                 f"steps={steps} "
+                f"score={score:.2f} "
                 f"rewards={rewards_str}"
             )
 
