@@ -1,24 +1,14 @@
-from typing import Any, Dict, List, Tuple
-
 from grader import (
     grade_lane_keeping,
     grade_obstacle_avoidance,
     grade_signal_handling,
 )
-from models import Action, Observation, Reward
+from models import Observation, Reward, Action
 
 
 class AutoPilotEnv:
-    ENV_ID = "autopilotenv"
-
     def __init__(self):
-        self.tasks = self._build_tasks()
-        self.task_index = 0
-        self.current_task: Dict[str, Any] = {}
-        self.done = False
-
-    def _build_tasks(self) -> List[Dict[str, Any]]:
-        return [
+        self.tasks = [
             {
                 "task_name": "lane_keeping",
                 "step": 0,
@@ -29,108 +19,82 @@ class AutoPilotEnv:
             },
             {
                 "task_name": "obstacle_avoidance",
-                "step": 0,
+                "step": 1,
                 "front_distance": 5.0,
                 "left_lane_clear": True,
                 "right_lane_clear": False,
             },
             {
                 "task_name": "signal_safety",
-                "step": 0,
+                "step": 2,
                 "traffic_light": "red",
                 "pedestrian_crossing": True,
                 "pedestrian_distance": 4.0,
             },
             {
                 "task_name": "emergency_braking",
-                "step": 0,
+                "step": 3,
                 "front_distance": 2.0,
                 "left_lane_clear": False,
                 "right_lane_clear": False,
             },
             {
                 "task_name": "pedestrian_priority",
-                "step": 0,
+                "step": 4,
                 "traffic_light": "green",
                 "pedestrian_crossing": True,
                 "pedestrian_distance": 3.0,
             },
         ]
 
-    def reset(self) -> Observation:
         self.task_index = 0
-        self.current_task = dict(self.tasks[0])
-        self.done = False
+        self.current_task = self.tasks[0]
+
+    def reset(self):
+        self.task_index = 0
+        self.current_task = self.tasks[0]
         return Observation(**self.current_task)
 
-    def state(self) -> Dict[str, Any]:
-        return {
-            "env_id": self.ENV_ID,
-            "task_index": self.task_index,
-            "current_task": self.current_task,
-            "done": self.done,
-        }
+    def step(self, action: Action):
+        task_name = self.current_task["task_name"]
 
-    def _safe_reward(self, score: float) -> Reward:
-        """
-        Keep reward strictly inside (0,1)
-        """
-        safe = max(0.01, min(0.99, float(score)))
-        safe = round(safe, 4)
-
-        return Reward(
-            score=safe,
-            reason="task_progress"
-        )
-
-    def step(
-        self,
-        action: Action,
-    ) -> Tuple[Observation, Reward, bool, Dict[str, Any]]:
-        if not self.current_task:
-            self.reset()
-
-        # Save current task before moving ahead
-        current = dict(self.current_task)
-        task_name = current["task_name"]
-
-        # Grade based on CURRENT task
         if task_name == "lane_keeping":
-            grade = grade_lane_keeping(current, action)
+            grade = grade_lane_keeping(self.current_task, action)
 
         elif task_name in {
             "obstacle_avoidance",
             "emergency_braking",
         }:
-            grade = grade_obstacle_avoidance(current, action)
-
-        else:
-            grade = grade_signal_handling(current, action)
-
-        reward = self._safe_reward(grade)
-
-        # Final task check
-        done = self.task_index == len(self.tasks) - 1
-
-        info = {
-            "task_name": task_name,
-            "task_index": self.task_index,
-            "reward_score": reward.score,
-        }
-
-        # Return CURRENT observation
-        response_obs = Observation(**current)
-
-        # Advance for next API call
-        if not done:
-            self.task_index += 1
-            self.current_task = dict(
-                self.tasks[self.task_index]
+            grade = grade_obstacle_avoidance(
+                self.current_task,
+                action
             )
-        else:
-            self.done = True
 
-        return response_obs, reward, done, info
+        else:
+            grade = grade_signal_handling(
+                self.current_task,
+                action
+            )
+
+        reward = Reward(
+            score=min(max(grade, 0.01), 0.99),
+            reason="task_progress",
+        )
+
+        done = False
+
+        if self.task_index < len(self.tasks) - 1:
+            self.task_index += 1
+            self.current_task = self.tasks[self.task_index]
+        else:
+            done = True
+
+        return (
+            Observation(**self.current_task),
+            reward,
+            done,
+            {"task_name": task_name},
+        )
 
     def close(self):
-        self.done = True
+        pass
