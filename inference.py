@@ -15,21 +15,15 @@ MODEL_NAME = os.getenv(
     "gpt-4.1-mini"
 )
 
-HF_TOKEN = os.getenv("HF_TOKEN")
-
-if HF_TOKEN is None:
-    raise ValueError(
-        "HF_TOKEN environment variable is required"
-    )
-
-
-client = OpenAI(
-    base_url=API_BASE_URL,
-    api_key=HF_TOKEN
-)
+client = None
 
 
 def ping_proxy():
+    global client
+
+    if client is None:
+        return
+
     try:
         client.chat.completions.create(
             model=MODEL_NAME,
@@ -75,6 +69,7 @@ def fallback_action(task_name: str) -> Action:
             brake=1.0,
             lane_change="none",
         )
+
 
 def main():
     global client
