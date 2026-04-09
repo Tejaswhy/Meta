@@ -6,16 +6,17 @@ TaskName = Literal[
     "obstacle_avoidance",
     "signal_safety",
     "emergency_braking",
-    "pedestrian_priority"
+    "pedestrian_priority",
 ]
 
 TrafficLight = Literal["red", "yellow", "green"]
+
 RoadCurvature = Literal[
     "straight",
     "slight_left",
     "slight_right",
     "sharp_left",
-    "sharp_right"
+    "sharp_right",
 ]
 
 
@@ -42,9 +43,7 @@ class Action(BaseModel):
     acceleration: float = 0.0
     brake: float = 0.0
     action_type: Optional[str] = None
-    lane_change: Optional[
-        Literal["left", "right", "none"]
-    ] = "none"
+    lane_change: Literal["left", "right", "none"] = "none"
 
 
 class Reward(BaseModel):
