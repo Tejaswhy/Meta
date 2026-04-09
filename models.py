@@ -1,7 +1,6 @@
 from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
-
 TaskName = Literal[
     "lane_keeping",
     "obstacle_avoidance",
@@ -44,7 +43,9 @@ class Action(BaseModel):
     acceleration: float = 0.0
     brake: float = 0.0
     action_type: Optional[str] = None
-    lane_change: Literal["left", "right", "none"] = "none"
+    lane_change: Optional[
+        Literal["left", "right", "none"]
+    ] = "none"
 
 
 class Reward(BaseModel):
