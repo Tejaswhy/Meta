@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import io
+import contextlib
 from typing import Dict
 
 import gradio as gr
 from fastapi import FastAPI
+from fastapi.responses import PlainTextResponse
 
+from inference import main
 from env import AutoPilotEnv as _AutoPilotEnv
 from models import Action
 
@@ -232,16 +236,14 @@ with gr.Blocks(title="AutoPilotEnv Live Dashboard") as demo:
     )
 
 
-@api.get("/")
+@api.get("/", response_class=PlainTextResponse)
 def home():
-    return {
-        "status": "AutoPilotEnv API is running 🚀",
-        "routes": [
-            "POST /reset",
-            "POST /step",
-            "GET /state",
-        ],
-    }
+    buffer = io.StringIO()
+
+    with contextlib.redirect_stdout(buffer):
+        main()
+
+    return buffer.getvalue()
 
 
 @api.post("/reset")
