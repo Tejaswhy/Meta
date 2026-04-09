@@ -1,7 +1,6 @@
 name: autopilotenv
 description: Deterministic autonomous driving decision environment for the Meta OpenEnv RL Challenge.
 version: 1.0.0
-entrypoint: env:AutoPilotEnv
 author: AutoPilotEnv Team
 
 observation_model: models:Observation
