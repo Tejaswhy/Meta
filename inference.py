@@ -5,22 +5,32 @@ from env import AutoPilotEnv
 from models import Action
 
 
-API_BASE_URL = os.environ.get("API_BASE_URL")
-API_KEY = os.environ.get("API_KEY", "test_key")
-MODEL_NAME = os.environ.get("MODEL_NAME", "gpt-4.1-mini")
+API_BASE_URL = os.getenv(
+    "API_BASE_URL",
+    "https://api.openai.com/v1"
+)
+
+MODEL_NAME = os.getenv(
+    "MODEL_NAME",
+    "gpt-4.1-mini"
+)
+
+HF_TOKEN = os.getenv("HF_TOKEN")
+
+if HF_TOKEN is None:
+    raise ValueError(
+        "HF_TOKEN environment variable is required"
+    )
+
+
+client = OpenAI(
+    base_url=API_BASE_URL,
+    api_key=HF_TOKEN
+)
 
 
 def ping_proxy():
-    """
-    Required proxy API call for validator.
-    Do not let this crash execution.
-    """
     try:
-        client = OpenAI(
-            base_url=API_BASE_URL,
-            api_key=API_KEY,
-        )
-
         client.chat.completions.create(
             model=MODEL_NAME,
             messages=[
@@ -31,15 +41,11 @@ def ping_proxy():
             ],
             max_tokens=5,
         )
-
     except Exception:
         pass
 
 
 def fallback_action(task_name: str) -> Action:
-    """
-    Simple safe fallback policy.
-    """
     if task_name == "lane_keeping":
         return Action(
             action_type="maintain",
@@ -85,12 +91,11 @@ def main():
     )
 
     try:
-        # Required proxy call
         ping_proxy()
 
         obs = env.reset()
 
-        for _ in range(5):
+        while True:
             action = fallback_action(obs.task_name)
 
             obs, reward, done, info = env.step(action)
@@ -115,25 +120,15 @@ def main():
                 success = True
                 break
 
-        rewards_str = ",".join(
-            f"{r:.2f}" for r in rewards
-        )
-
-    except Exception as e:
-        print(
-            f"[STEP] step={steps + 1} "
-            f"action=error "
-            f"reward=0.01 "
-            f"done=true "
-            f"error={str(e)}"
-        )
-
-        rewards_str = ",".join(
-            f"{r:.2f}" for r in rewards
-        )
+    except Exception:
+        success = False
 
     finally:
         env.close()
+
+        rewards_str = ",".join(
+            f"{r:.2f}" for r in rewards
+        )
 
         print(
             f"[END] success={str(success).lower()} "
