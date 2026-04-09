@@ -76,65 +76,77 @@ def fallback_action(task_name: str) -> Action:
             lane_change="none",
         )
 
-
 def main():
-    env = AutoPilotEnv()
+    global client
 
-    rewards = []
-    steps = 0
-    success = False
+    HF_TOKEN = os.getenv("HF_TOKEN", "test_key")
 
-    print(
-        f"[START] task=all_tasks "
-        f"env=autopilotenv "
-        f"model={MODEL_NAME}"
+    client = OpenAI(
+        base_url=API_BASE_URL,
+        api_key=HF_TOKEN
     )
 
-    try:
-        ping_proxy()
+    tasks = [
+        "lane_keeping",
+        "obstacle_avoidance",
+        "signal_safety",
+        "emergency_braking",
+        "pedestrian_priority",
+    ]
 
-        obs = env.reset()
+    for task_name in tasks:
+        env = AutoPilotEnv()
 
-        while True:
-            action = fallback_action(obs.task_name)
-
-            obs, reward, done, info = env.step(action)
-
-            safe_score = round(
-                max(0.01, min(0.99, float(reward.score))),
-                2
-            )
-
-            rewards.append(safe_score)
-            steps += 1
-
-            print(
-                f"[STEP] step={steps} "
-                f"action={action.action_type} "
-                f"reward={safe_score:.2f} "
-                f"done={str(done).lower()} "
-                f"error=null"
-            )
-
-            if done:
-                success = True
-                break
-
-    except Exception:
+        rewards = []
+        steps = 0
         success = False
 
-    finally:
-        env.close()
-
-        rewards_str = ",".join(
-            f"{r:.2f}" for r in rewards
-        )
-
         print(
-            f"[END] success={str(success).lower()} "
-            f"steps={steps} "
-            f"rewards={rewards_str}"
+            f"[START] task={task_name} "
+            f"env=autopilotenv "
+            f"model={MODEL_NAME}"
         )
+
+        try:
+            obs = env.reset()
+
+            for _ in range(5):
+                action = fallback_action(task_name)
+
+                obs, reward, done, info = env.step(action)
+
+                safe_score = round(
+                    max(0.01, min(0.99, float(reward.score))),
+                    2
+                )
+
+                rewards.append(safe_score)
+                steps += 1
+
+                print(
+                    f"[STEP] step={steps} "
+                    f"action={action.action_type} "
+                    f"reward={safe_score:.2f} "
+                    f"done={str(done).lower()} "
+                    f"error=null"
+                )
+
+                if done:
+                    success = True
+                    break
+
+        finally:
+            env.close()
+
+            rewards_str = ",".join(
+                f"{r:.2f}" for r in rewards
+            )
+
+            print(
+                f"[END] success={str(success).lower()} "
+                f"steps={steps} "
+                f"rewards={rewards_str}"
+            )
 
 
 if __name__ == "__main__":
