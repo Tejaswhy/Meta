@@ -14,11 +14,10 @@ class AutoPilotEnv:
     def __init__(self):
         self.tasks = self._build_tasks()
         self.task_index = 0
-        self.current_task = {}
+        self.current_task: Dict[str, Any] = {}
         self.done = False
-        self.closed = False
 
-    def _build_tasks(self):
+    def _build_tasks(self) -> List[Dict[str, Any]]:
         return [
             {
                 "task_name": "lane_keeping",
@@ -58,60 +57,80 @@ class AutoPilotEnv:
             },
         ]
 
-    def _obs(self):
-        return Observation(**self.current_task)
-
-    def reset(self):
+    def reset(self) -> Observation:
         self.task_index = 0
         self.current_task = dict(self.tasks[0])
         self.done = False
-        return self._obs()
+        return Observation(**self.current_task)
 
-    def _strict_reward(self, value):
-        return round(min(max(value, 0.01), 0.99), 4)
+    def state(self) -> Dict[str, Any]:
+        return {
+            "env_id": self.ENV_ID,
+            "task_index": self.task_index,
+            "current_task": self.current_task,
+            "done": self.done,
+        }
 
-    def step(
-        self,
-        action: Action
-    ) -> Tuple[Observation, Reward, bool, Dict]:
-        task_name = self.current_task["task_name"]
+    def _safe_reward(self, score: float) -> Reward:
+        """
+        Keep reward strictly inside (0,1)
+        """
+        safe = max(0.01, min(0.99, float(score)))
+        safe = round(safe, 4)
 
-        if task_name == "lane_keeping":
-            grade = grade_lane_keeping(
-                self.current_task,
-                action
-            )
-        elif task_name in {
-            "obstacle_avoidance",
-            "emergency_braking"
-        }:
-            grade = grade_obstacle_avoidance(
-                self.current_task,
-                action
-            )
-        else:
-            grade = grade_signal_handling(
-                self.current_task,
-                action
-            )
-
-        reward = Reward(
-            score=self._strict_reward(grade),
+        return Reward(
+            score=safe,
             reason="task_progress"
         )
 
-        if self.task_index < len(self.tasks) - 1:
+    def step(
+        self,
+        action: Action,
+    ) -> Tuple[Observation, Reward, bool, Dict[str, Any]]:
+        if not self.current_task:
+            self.reset()
+
+        # Save current task before moving ahead
+        current = dict(self.current_task)
+        task_name = current["task_name"]
+
+        # Grade based on CURRENT task
+        if task_name == "lane_keeping":
+            grade = grade_lane_keeping(current, action)
+
+        elif task_name in {
+            "obstacle_avoidance",
+            "emergency_braking",
+        }:
+            grade = grade_obstacle_avoidance(current, action)
+
+        else:
+            grade = grade_signal_handling(current, action)
+
+        reward = self._safe_reward(grade)
+
+        # Final task check
+        done = self.task_index == len(self.tasks) - 1
+
+        info = {
+            "task_name": task_name,
+            "task_index": self.task_index,
+            "reward_score": reward.score,
+        }
+
+        # Return CURRENT observation
+        response_obs = Observation(**current)
+
+        # Advance for next API call
+        if not done:
             self.task_index += 1
             self.current_task = dict(
                 self.tasks[self.task_index]
             )
-            done = False
         else:
-            done = True
+            self.done = True
 
-        return self._obs(), reward, done, {
-            "task_name": task_name
-        }
+        return response_obs, reward, done, info
 
     def close(self):
-        self.closed = True
+        self.done = True
